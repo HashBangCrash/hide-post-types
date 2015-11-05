@@ -134,14 +134,12 @@ class hide_post_types_settings {
 	 * @param string $setting_label       Optional - A text label (<label> element) linked to the input.
 	 */
 	public function add_setting( $setting_id, $setting_description = "", $setting_label = "" ) {
-		$this->plugin_settings_exist = true; // if user adds a setting, set to true so that a section is created.
-
 		add_settings_field(
 			$setting_id,                      // ID used to identify the field throughout the theme
 			$setting_description,                           // The label to the left of the option interface element
 			array(
 				$this,
-				'shortcodes_input_text'
+				'settings_input_text'
 			),   // The name of the function responsible for rendering the option interface
 			$this->get_page_slug(),                         // The page on which this option will be displayed
 			$this->get_section_name(),         // The name of the section to which this field belongs
@@ -153,6 +151,54 @@ class hide_post_types_settings {
 			)
 		);
 
+	}
+
+	/**
+	 * Add the settings section for this shortcode to the plugin settings page.
+	 * @return mixed
+	 */
+	public function add_settings_section() {
+
+		register_setting(
+			$this->option_group_name,
+			$this->get_option_database_key()
+		//array( $this, 'sanitize' ) // sanitize function
+		);
+
+		add_settings_section(
+			$this->get_section_name(),
+			$this->get_section_title(), // start of section text shown to user
+			array( $this, 'print_section_description' ),
+			$this->get_page_slug()
+		);
+	}
+
+	/**
+	 * Adds the appropriate settings for the plugin settings page.
+	 */
+	public function init_shortcode_settings() {
+		$this->add_settings();
+		$this->add_settings_section();
+
+	}
+
+	/**
+	 * Creates the HTML code that is printed for each input on the UCF COM Shortcodes options page under this
+	 * shortcode's section.
+	 *
+	 * @param $args
+	 */
+	public function settings_input_text( $args ) {
+		// Note the ID and the name attribute of the element should match that of the ID in the call to add_settings_field.
+		// Because we only call register_setting once, all the options are stored in an array in the database. So we
+		// have to name our inputs with the name of an array. ex <input type="text" id=option_key name="option_group_name[option_key]" />.
+		// WordPress will automatically serialize the inputs that are in this array form and store it under
+		// the option_group_name field. Then get_option will automatically unserialize and grab the value already set and pass it in via the $args as the 'value' parameter.
+		$html = '<input type="text" id="' . $args[ 'id' ] . '" name="' . $args[ 'section' ] . '[' . $args[ 'id' ] . ']" value="' . ( $args[ 'value' ] ) . '"/>';
+
+		// Here, we will take the first argument of the array and add it to a label next to the input
+		$html .= '<label for="' . $args[ 'id' ] . '"> ' . $args[ 'label' ] . '</label>';
+		echo $html;
 	}
 
 	/**
