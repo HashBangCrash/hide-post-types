@@ -1,0 +1,11 @@
+Do I just need a checkbox to hide, or are there other options I can set?
+* IE Instead of unregistering, I could mark as non-public.
+
+Make sure that the admin "get all post types" has a higher priority (load first) than the "remove post type"
+* Check to see if WP has a priority or similar for action 'wp_loaded'
+
+Make sure the default is 'show' for all.
+
+Let the network settings go to all sites, but allow sites to override.
+* This way, the network setting to hide "posts" will be easy, and for the specfic sites that need it, they will override
+* Perhaps there should be an option in network to block overriding.
