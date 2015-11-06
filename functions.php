@@ -22,6 +22,10 @@ License: GPLv2 or later
 class hide_post_types_settings {
 
 	const option_group_name = 'hide-post-types-settings-group';
+
+	const section_builtin     = 'hide-post-types-builtin';
+	const section_custom      = 'hide-post-types-custom';
+
 	const page_title        = 'Hide Post Types Settings'; //
 	const menu_title        = 'Hide Post Types Settings';
 	const capability        = 'manage_options'; // user capability required to view the page
@@ -30,7 +34,7 @@ class hide_post_types_settings {
 	/*	const javascript_handle = 'ucf_com_shortcodes_js'; // just a unique handle for WordPress
 		const javascript_var    = 'ucf_com_shortcodes_tinymce'; // global javascript variable that holds tinymce menu structure*/
 
-	private $posttypes_wp_builtin = array('post','page','attachment','revision','nav_menu_item'); // built-in (since WP 3.0)
+	private static $posttypes_wp_builtin = array('post','page','attachment','revision','nav_menu_item'); // built-in (since WP 3.0)
 
 	public function __construct() {
 		register_activation_hook( __FILE__, array(
@@ -114,87 +118,121 @@ class hide_post_types_settings {
 	 */
 	public function admin_init() {
 
-		$this->posttypes = ;
-		foreach ($this->posttypes as $posttype) {
-			$this->add_setting(
-				$posttype->slug,// ID used to identify the field throughout the theme
-				'PlayerID (deprecated)',                           // The label to the left of the option interface element
-				'PlayerID as defined by your Brightcove account. This has been replaced by the playerKey field.'
-			);
+		$this->add_settings_section();
+
+		$this->posttypes = get_post_types('', 'objects');
+		foreach ($this->posttypes as $post_object) {
+			$this->add_setting($post_object);
 		}
 	}
 
 	/**
-	 * Adds an input field to save settings. The $setting_id can be referenced
-	 * by the shortcode replacement function. Generally, this is used to set
-	 * defaults for optional fields the user can define.
+	 * Adds a checkbox field for each post type
 	 *
-	 * @param string $setting_id          This must be unique. Prepend with shortcode name.
-	 * @param string $setting_description Optional - A description of the input.
-	 * @param string $setting_label       Optional - A text label (<label> element) linked to the input.
+	 * @param string $setting_id
 	 */
-	public function add_setting( $setting_id, $setting_description = "", $setting_label = "" ) {
+	public function add_setting( $post_object ) {
+		// add setting, and register it
+
+		$setting_id = $this->unique_setting_id($post_object);
 		add_settings_field(
-			$setting_id,                      // ID used to identify the field throughout the theme
-			$setting_description,                           // The label to the left of the option interface element
+			$setting_id,  // Unique ID used to identify the field
+			$post_object->name,  // The label to the left of the option.
 			array(
 				$this,
-				'settings_input_text'
+				'settings_input_checkbox'
 			),   // The name of the function responsible for rendering the option interface
-			$this->get_page_slug(),                         // The page on which this option will be displayed
-			$this->get_section_name(),         // The name of the section to which this field belongs
-			array(   // The array of arguments to pass to the callback.
+			self::page_slug,                         // The page on which this option will be displayed
+			$this->get_proper_section($post_object),         // The name of the section to which this field belongs
+			array(   // The array of arguments to pass to the callback. These 4 are referenced in setting_input_checkbox.
 			         'id'      => $setting_id, // copy/paste id here
-			         'label'   => $setting_label,
-			         'section' => $this->get_section_name(),
-			         'value'   => $this->get_database_settings_value( $setting_id )
+			         'label'   => $post_object->label,
+			         'section' => $this->get_proper_section($post_object),
+			         'value'   => $this->get_database_settings_value( $post_object )
 			)
+		);
+		register_setting(
+			self::option_group_name,
+			$setting_id
+		//array( $this, 'sanitize' ) // sanitize function
 		);
 
 	}
 
 	/**
-	 * Add the settings section for this shortcode to the plugin settings page.
+	 * A unique identifier to save in the database. This uses the setting group plus the post slug.
+	 * @param $setting_object
+	 *
+	 * @return string
+	 */
+	public function unique_setting_id($post_object){
+		return self::option_group_name . '-' . $post_object->name;
+	}
+
+	/**
+	 * Returns the correct section for a specific setting based on the post type slug.
+	 * Basically, if the $setting_slug is a built-in post type, it will return the "built-in"
+	 * section. Otherwise, it will return the "custom" section.
+	 *
+	 * @param $setting_slug
+	 *
+	 * @return string The section this preference should be sorted under.
+	 */
+	public function get_proper_section($post_object){
+		if (in_array($post_object->name, $this->posttypes_wp_builtin)) {
+			return self::section_builtin;
+		} else {
+			return self::section_custom;
+		}
+	}
+
+	/**
+	 * Add the settings section for both built-in and custom post types (to distinguish between the two)
 	 * @return mixed
 	 */
 	public function add_settings_section() {
 
-		register_setting(
-			$this->option_group_name,
-			$this->get_option_database_key()
-		//array( $this, 'sanitize' ) // sanitize function
-		);
-
 		add_settings_section(
-			$this->get_section_name(),
-			$this->get_section_title(), // start of section text shown to user
-			array( $this, 'print_section_description' ),
-			$this->get_page_slug()
+			self::section_builtin,
+			"Built-in", // start of section text shown to user
+			"Caution",
+			self::page_slug
+		);
+		add_settings_section(
+			self::section_custom,
+			"Custom",
+			"No caution",
+			self::page_slug
 		);
 	}
 
 	/**
-	 * Adds the appropriate settings for the plugin settings page.
-	 */
-	public function init_shortcode_settings() {
-		$this->add_settings();
-		$this->add_settings_section();
-
-	}
-
-	/**
-	 * Creates the HTML code that is printed for each input on the UCF COM Shortcodes options page under this
-	 * shortcode's section.
+	 * Creates the HTML code that is printed for each setting input
 	 *
 	 * @param $args
 	 */
-	public function settings_input_text( $args ) {
+	public function settings_input_checkbox( $args ) {
 		// Note the ID and the name attribute of the element should match that of the ID in the call to add_settings_field.
 		// Because we only call register_setting once, all the options are stored in an array in the database. So we
 		// have to name our inputs with the name of an array. ex <input type="text" id=option_key name="option_group_name[option_key]" />.
 		// WordPress will automatically serialize the inputs that are in this array form and store it under
 		// the option_group_name field. Then get_option will automatically unserialize and grab the value already set and pass it in via the $args as the 'value' parameter.
-		$html = '<input type="text" id="' . $args[ 'id' ] . '" name="' . $args[ 'section' ] . '[' . $args[ 'id' ] . ']" value="' . ( $args[ 'value' ] ) . '"/>';
+		if ($args[ 'value' ]) {
+			$checked = 'checked="checked"';
+		} else {
+			$checked = '';
+		}
+
+		$html = '';
+
+		// create a hidden variable with the same name and no value. if the box is unchecked, the hidden value will be POSTed.
+		// If the value is checked, only the checkbox will be sent.
+		// This way, we don't have to uncheck everything server-side and then re-check the POSTed values.
+		// This is particularly useful to prevent preferences from being deleted if a post type is removed from a theme's code.
+		// If we just unchecked everything, old post types would lose their preferences; if they are later reactivated, the preference
+		// would be gone. This way, the preference persists.
+		$html .= '<input type="hidden"   id="' . $args[ 'id' ] . '" name="' . $args[ 'section' ] . '[' . $args[ 'id' ] . ']" value=""/>';
+		$html .= '<input type="checkbox" id="' . $args[ 'id' ] . '" name="' . $args[ 'section' ] . '[' . $args[ 'id' ] . ']" value="' . ( $args[ 'id' ] ) . '" ' . $checked . '/>';
 
 		// Here, we will take the first argument of the array and add it to a label next to the input
 		$html .= '<label for="' . $args[ 'id' ] . '"> ' . $args[ 'label' ] . '</label>';
@@ -202,15 +240,29 @@ class hide_post_types_settings {
 	}
 
 	/**
+	 * Grabs the database value for the $settings_id option. The value is stored in a serialized array in the database.
+	 * It returns the value after sanitizing it.
+	 *
+	 * @param $setting_object
+	 *
+	 * @return string|void
+	 */
+	public function get_database_settings_value( $setting_object ) {
+		$data = get_option( $this->get_proper_section($setting_object) );
+
+		return esc_attr( $data[ $this->unique_setting_id($setting_object) ] );
+	}
+
+	/**
 	 * On every page load, disable the post types specified.
 	 */
 	public function page_init() {
-		$this->posttypes_custom = ;
-		foreach (  ) {
+		$this->posttypes = get_post_types('', 'objects');
+		foreach ($this->posttypes as $post_object) {
 			// get setting
 			// if set to hide, then hide
-			if (/* is hidden */) {
-				$this->unregister_post_type($posttype->);
+			if ($this->get_database_settings_value( $post_object )) {
+				$this->unregister_post_type($post_object->name);
 			}
 		}
 	}
