@@ -10,7 +10,7 @@
 Plugin Name: Hide Post Types
 Plugin URI: https://github.com/schrauger/hide-post-types
 Description: Hide or disable any post type, whether built-in or custom.
-Version: 0.1
+Version: 1.0
 Author: Stephen Schrauger
 Author URI: https://www.schrauger.com/
 License: GPLv2 or later
@@ -31,10 +31,8 @@ class hide_post_types_settings {
 	const capability        = 'manage_options'; // user capability required to view the page
 	const page_slug         = 'hide-post-types-settings'; // unique page name, also called menu_slug
 
-	/*	const javascript_handle = 'ucf_com_shortcodes_js'; // just a unique handle for WordPress
-		const javascript_var    = 'ucf_com_shortcodes_tinymce'; // global javascript variable that holds tinymce menu structure*/
-
-	private static $posttypes_wp_builtin = array('post','page','attachment','revision','nav_menu_item'); // built-in (since WP 3.0)
+	private $posttypes_wp_builtin = array('post','page','attachment','revision','nav_menu_item'); // built-in (since WP 3.0)
+	private $posttypes_wp_builtin_exclude = array('revision','nav_menu_item'); // these two aren't normal types, and hiding does nothing.
 
 	public function __construct() {
 		register_activation_hook( __FILE__, array(
@@ -52,8 +50,9 @@ class hide_post_types_settings {
 
 		// Register the 'settings' page
 		add_action( 'admin_menu', array( $this, 'add_plugin_page' ) );
+		add_action( 'admin_menu', array( $this, 'admin_menu_init' ) );
 		add_action( 'admin_init', array( $this, 'admin_init' ) );
-		add_action( 'init', array( $this, 'page_init' ) );
+		add_action( 'wp_loaded', array( $this, 'page_init' ) );
 
 		// Add a link from the plugin page to this plugin's settings page
 		add_filter( 'plugin_row_meta', array( $this, 'plugin_action_links' ), 10, 2 );
@@ -146,14 +145,14 @@ class hide_post_types_settings {
 			$this->get_proper_section($post_object),         // The name of the section to which this field belongs
 			array(   // The array of arguments to pass to the callback. These 4 are referenced in setting_input_checkbox.
 			         'id'      => $setting_id, // copy/paste id here
-			         'label'   => $post_object->label,
+			         'label'   => "Hide " . $post_object->label,
 			         'section' => $this->get_proper_section($post_object),
 			         'value'   => $this->get_database_settings_value( $post_object )
 			)
 		);
 		register_setting(
 			self::option_group_name,
-			$setting_id
+			$this->get_proper_section($post_object)
 		//array( $this, 'sanitize' ) // sanitize function
 		);
 
@@ -180,7 +179,11 @@ class hide_post_types_settings {
 	 */
 	public function get_proper_section($post_object){
 		if (in_array($post_object->name, $this->posttypes_wp_builtin)) {
-			return self::section_builtin;
+			if (in_array($post_object->name, $this->posttypes_wp_builtin_exclude)){
+				return null; // a null section will cause the option to not show up in the preferences page.
+			} else {
+				return self::section_builtin;
+			}
 		} else {
 			return self::section_custom;
 		}
@@ -194,13 +197,13 @@ class hide_post_types_settings {
 
 		add_settings_section(
 			self::section_builtin,
-			"Built-in", // start of section text shown to user
+			"Built-in WordPress Post Types", // start of section text shown to user
 			"Caution",
 			self::page_slug
 		);
 		add_settings_section(
 			self::section_custom,
-			"Custom",
+			"Custom Post Types",
 			"No caution",
 			self::page_slug
 		);
@@ -268,16 +271,73 @@ class hide_post_types_settings {
 	}
 
 	/**
-	 * Removes the specified post type
+	 * On every page load, disable the post types specified.
+	 */
+	public function admin_menu_init() {
+		$this->posttypes = get_post_types('', 'objects');
+		foreach ($this->posttypes as $post_object) {
+			// get setting
+			// if set to hide, then hide
+			if ($this->get_database_settings_value( $post_object )) {
+				$this->hide_post_menu($post_object->name);
+			}
+		}
+	}
+
+	/**
+	 * Removes the specified post type.
+	 * This function does not 'unset' the post type,
+	 * because then the preference page (which loads after this function in add_action order (unavoidable))
+	 * would not know about the post types. Thus leading to the inability
+	 * to restore the post type that is hidden.
 	 */
 	function unregister_post_type( $post_type_slug ) {
 		//$post_type = 'post';
 		global $wp_post_types;
 		if ( isset( $wp_post_types[ $post_type_slug ] ) ) {
-			unset( $wp_post_types[ $post_type_slug ] );
+
+			$wp_post_types[ $post_type_slug ]->public = false;
+			$wp_post_types[ $post_type_slug ]->exclude_from_search = true;
+			$wp_post_types[ $post_type_slug ]->publicly_queryable = false;
+			$wp_post_types[ $post_type_slug ]->show_in_nav_menus = false;
+			$wp_post_types[ $post_type_slug ]->show_ui = false;
+			$wp_post_types[ $post_type_slug ]->capabilities->create_posts = false;
+			$wp_post_types[ $post_type_slug ]->map_meta_cap = false;
+
+			$wp_post_types[ $post_type_slug ]->show_ui = false;
+			$wp_post_types[ $post_type_slug ]->show_in_nav_menus = false;
+			$wp_post_types[ $post_type_slug ]->show_in_menu = false;
+			$wp_post_types[ $post_type_slug ]->show_in_admin_bar = false;
+
+			// built-in
+			//if ($post_type_slug == 'post') {
+				//remove_menu_page( 'edit.php' );
+			//}
+			//unset( $wp_post_types[ $post_type_slug ] );
+
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Removes the "Add New..." post menu
+	 * @param $post_type_slug
+	 */
+	function hide_post_menu( $post_type_slug ) {
+		global $submenu;
+		//echo "Removing menu " . $post_type_slug . "<br />";
+		//print_r($submenu);
+		//unset($submenu['post-new.php?post_type=' . $post_type_slug][10]);
+		if ($post_type_slug == 'post') {
+			remove_menu_page( 'edit.php' );
+		}
+		if ($post_type_slug == 'attachment') {
+			remove_menu_page( 'upload.php');
+		}
+		if ($post_type_slug == 'page') {
+			remove_menu_page( 'edit.php?post_type=page');
+		}
 	}
 
 	/**
