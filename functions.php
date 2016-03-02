@@ -31,6 +31,7 @@ class hide_post_types_settings {
 	const capability        = 'manage_options'; // user capability required to view the page
 	const page_slug         = 'hide-post-types-settings'; // unique page name, also called menu_slug
 
+	public $posttypes;
 	private $posttypes_wp_builtin = array('post','page','attachment','revision','nav_menu_item'); // built-in (since WP 3.0)
 	private $posttypes_wp_builtin_exclude = array('revision','nav_menu_item'); // these two aren't normal types, and hiding does nothing.
 
@@ -128,7 +129,7 @@ class hide_post_types_settings {
 	/**
 	 * Adds a checkbox field for each post type
 	 *
-	 * @param string $setting_id
+	 * @param string $post_object
 	 */
 	public function add_setting( $post_object ) {
 		// add setting, and register it
@@ -160,7 +161,7 @@ class hide_post_types_settings {
 
 	/**
 	 * A unique identifier to save in the database. This uses the setting group plus the post slug.
-	 * @param $setting_object
+	 * @param $post_object
 	 *
 	 * @return string
 	 */
@@ -173,7 +174,7 @@ class hide_post_types_settings {
 	 * Basically, if the $setting_slug is a built-in post type, it will return the "built-in"
 	 * section. Otherwise, it will return the "custom" section.
 	 *
-	 * @param $setting_slug
+	 * @param $post_object
 	 *
 	 * @return string The section this preference should be sorted under.
 	 */
@@ -290,6 +291,10 @@ class hide_post_types_settings {
 	 * because then the preference page (which loads after this function in add_action order (unavoidable))
 	 * would not know about the post types. Thus leading to the inability
 	 * to restore the post type that is hidden.
+	 *
+	 * @param $post_type_slug
+	 *
+	 * @return bool
 	 */
 	function unregister_post_type( $post_type_slug ) {
 		//$post_type = 'post';
