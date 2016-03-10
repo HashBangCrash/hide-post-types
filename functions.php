@@ -306,6 +306,7 @@ class hide_post_types_settings {
 			$wp_post_types[ $post_type_slug ]->publicly_queryable = false;
 			$wp_post_types[ $post_type_slug ]->show_in_nav_menus = false;
 			$wp_post_types[ $post_type_slug ]->show_ui = false;
+			$wp_post_types[ $post_type_slug ]->capabilities = new StdClass;
 			$wp_post_types[ $post_type_slug ]->capabilities->create_posts = false;
 			$wp_post_types[ $post_type_slug ]->map_meta_cap = false;
 
