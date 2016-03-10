@@ -300,7 +300,7 @@ class hide_post_types_settings {
 		//$post_type = 'post';
 		global $wp_post_types;
 		if ( isset( $wp_post_types[ $post_type_slug ] ) ) {
-
+			$wp_post_types[ $post_type_slug ] = new StdClass;
 			$wp_post_types[ $post_type_slug ]->public = false;
 			$wp_post_types[ $post_type_slug ]->exclude_from_search = true;
 			$wp_post_types[ $post_type_slug ]->publicly_queryable = false;
