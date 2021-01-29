@@ -10,7 +10,7 @@
 Plugin Name: Hide Post Types
 Plugin URI: https://github.com/schrauger/hide-post-types
 Description: Hide or disable any post type, whether built-in or custom.
-Version: 1.0
+Version: 1.0.1
 Author: Stephen Schrauger
 Author URI: https://www.schrauger.com/
 License: GPLv2 or later
@@ -254,7 +254,7 @@ class hide_post_types_settings {
 	public function get_database_settings_value( $setting_object ) {
 		$data = get_option( $this->get_proper_section($setting_object) );
 
-		return esc_attr( $data[ $this->unique_setting_id($setting_object) ] );
+		return esc_attr( $data[ $this->unique_setting_id($setting_object) ] ?? null );
 	}
 
 	/**
