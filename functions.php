@@ -10,7 +10,7 @@
 Plugin Name: Hide Post Types
 Plugin URI: https://github.com/HashBangCrash/hide-post-types
 Description: Hide or disable any post type, whether built-in or custom.
-Version: 1.1.0
+Version: 1.1.1
 Author: Stephen Schrauger
 Author URI: https://www.schrauger.com/
 License: GPLv2 or later
@@ -20,7 +20,7 @@ License: GPLv2 or later
  * Settings|config page for plugin
  */
 
-namespace com\schrauger\hide_post_types;
+namespace hide_post_types;
 
 
 const option_group_name = 'hide-post-types-settings-group';
@@ -185,16 +185,16 @@ function get_proper_section($post_object){
 function add_settings_section() {
 
     \add_settings_section(
-        self::section_builtin,
+        section_builtin,
         "Built-in WordPress Post Types", // start of section text shown to user
         function(){return "Caution";},
-        self::page_slug
+        page_slug
     );
     \add_settings_section(
-        self::section_custom,
+        section_custom,
         "Custom Post Types",
         function(){return "No Caution";},
-        self::page_slug
+        page_slug
     );
 }
 
